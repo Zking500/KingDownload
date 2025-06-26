@@ -1,0 +1,17 @@
+COMPILAR A EXE (WINDOWS)
+
+1. Instala PyInstaller:
+   pip install pyinstaller
+
+2. Abre una terminal en la carpeta del proyecto.
+
+3. Ejecuta el siguiente comando para crear el ejecutable:
+   pyinstaller --noconfirm --onefile --windowed --icon=img/logo.ico ZkingDownload.py
+
+4. El ejecutable estará en la carpeta "dist".
+
+5. Copia la carpeta "img" y "sfx" (si tienes sonidos) junto al EXE para que se vean los iconos y suene la app.
+
+6. Si Windows detecta el EXE como virus, consulta el README para firmar el ejecutable o añade una excepción en tu antivirus.
+
+---
