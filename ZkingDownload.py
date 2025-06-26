@@ -16,6 +16,8 @@ import urllib.request
 import zipfile
 from tkinter import simpledialog
 import tempfile
+import urllib.parse
+import re
 
 try:
     import py7zr
@@ -190,6 +192,7 @@ class YouTubeDownloader(tk.Tk):
         self.current_thumbnail: ImageTk.PhotoImage | None = None
         self.only_mp3 = tk.BooleanVar(value=False)
         self.encoder = None
+        self.modo_var = tk.StringVar(value="video")  # video, lista, multi
 
         # ---- carga configuración previa ---- #
         self.load_config()
@@ -325,7 +328,11 @@ class YouTubeDownloader(tk.Tk):
         ayuda_menu = tk.Menu(menubar, tearoff=0)
         ayuda_menu.add_command(label="Acerca de formatos", command=self.show_help)
         ayuda_menu.add_command(
-            label="Créditos", command=lambda: messagebox.showinfo("Créditos", "Desarrollado por zkingStudios"))
+            label="Créditos", command=lambda: messagebox.showinfo(
+                "Créditos",
+                "Desarrollado por zkingStudios\nContacto: zking500studio@gmail.com"
+            )
+        )
         menubar.add_cascade(label="Ayuda", menu=ayuda_menu)
 
     # ---------- widgets ---------- #
@@ -333,16 +340,37 @@ class YouTubeDownloader(tk.Tk):
     def create_widgets(self) -> None:
         self.load_logo()
 
-        tk.Label(self, text="URL del video o playlist:", bg=FONDO_COLOR, fg=TEXTO_COLOR, font=FUENTE).pack(pady=(10, 0))
-        url_entry = tk.Entry(self, textvariable=self.url_var, width=70, font=FUENTE, bg=FONDO_COLOR,
-                             fg=TEXTO_COLOR, insertbackground=TEXTO_COLOR)
-        url_entry.pack(pady=5)
+        # Selector de modo
+        modo_frame = tk.Frame(self, bg=FONDO_COLOR)
+        modo_frame.pack(pady=(5, 0))
+        tk.Label(modo_frame, text="Modo:", bg=FONDO_COLOR, fg=TEXTO_COLOR, font=FUENTE).pack(side="left")
+        # Solo habilita el modo video único
+        modos = [
+            ("Video único", "video", True),
+            ("Lista (playlist) [v1.2]", "lista", False),
+            ("Multi videos [v1.2]", "multi", False)
+        ]
+        self.modo_radios = []
+        for texto, valor, habilitado in modos:
+            rb = tk.Radiobutton(
+                modo_frame, text=texto, variable=self.modo_var, value=valor,
+                bg=FONDO_COLOR, fg=TEXTO_COLOR, selectcolor=BOTON_COLOR, font=FUENTE,
+                command=self.on_modo_change, state="normal" if habilitado else "disabled"
+            )
+            rb.pack(side="left", padx=5)
+            self.modo_radios.append(rb)
 
-        self.btn_list = ttk.Button(self, text="Listar formatos (video)", command=self.list_formats_thread)
-        self.btn_list.pack(pady=5)
+        # Mensaje de modos en desarrollo
+        dev_label = tk.Label(
+            self, text="* Modos 'Lista' y 'Multi videos' estarán disponibles en la versión 1.2.",
+            bg=FONDO_COLOR, fg="orange", font=("Arial", 9, "italic")
+        )
+        dev_label.pack(pady=(0, 5))
 
-        self.thumbnail_label = tk.Label(self, bg=FONDO_COLOR)
-        self.thumbnail_label.pack(pady=5)
+        # Entrada de URL
+        self.url_entry = tk.Entry(self, textvariable=self.url_var, width=70, font=FUENTE, bg=FONDO_COLOR,
+                                  fg=TEXTO_COLOR, insertbackground=TEXTO_COLOR)
+        self.url_entry.pack(pady=5)
 
         tk.Label(self, text="Selecciona resolución (solo video):", bg=FONDO_COLOR, fg=TEXTO_COLOR,
                  font=FUENTE).pack(pady=(10, 0))
@@ -366,6 +394,10 @@ class YouTubeDownloader(tk.Tk):
         )
         self.only_mp3_check.pack(pady=2)
 
+        # Label para la miniatura
+        self.thumbnail_label = tk.Label(self, image=None, bg=FONDO_COLOR)
+        self.thumbnail_label.pack()
+
     def load_logo(self) -> None:
         logo_path = resource_path("img/logo.png")
         try:
@@ -375,6 +407,46 @@ class YouTubeDownloader(tk.Tk):
             tk.Label(self, image=photo, bg=FONDO_COLOR).pack(pady=5)
         except Exception:
             pass
+
+    def on_modo_change(self):
+        modo = self.modo_var.get()
+        if modo == "multi":
+            # Pregunta cuántos videos
+            n = simpledialog.askinteger("Multi videos", "¿Cuántos videos quieres descargar?", minvalue=1, maxvalue=20)
+            if not n:
+                self.modo_var.set("video")
+                return
+            # Borra campos previos si existen
+            if hasattr(self, "multi_entries"):
+                for entry in self.multi_entries:
+                    entry.destroy()
+            self.multi_entries = []
+            self.url_entry.pack_forget()
+            self.url_text.pack_forget()
+            self.multi_frame = tk.Frame(self, bg=FONDO_COLOR)
+            self.multi_frame.pack(pady=5)
+            for i in range(n):
+                entry = tk.Entry(self.multi_frame, width=70, font=FUENTE, bg=FONDO_COLOR, fg=TEXTO_COLOR, insertbackground=TEXTO_COLOR)
+                entry.grid(row=i, column=0, pady=2)
+                self.multi_entries.append(entry)
+            # Botón para continuar
+            btn = ttk.Button(self.multi_frame, text="Continuar", command=self.multi_continue)
+            btn.grid(row=n, column=0, pady=5)
+            self.multi_continue_btn = btn
+        else:
+            if hasattr(self, "multi_entries"):
+                for entry in self.multi_entries:
+                    entry.destroy()
+                self.multi_entries = []
+            if hasattr(self, "multi_frame"):
+                self.multi_frame.destroy()
+            self.url_text.pack_forget()
+            self.url_entry.pack(pady=5)
+
+    def get_urls(self):
+        # Solo modo video único
+        url = self.url_var.get().strip()
+        return [url] if url else []
 
     # ---------- utilidades de sonido ---------- #
 
@@ -439,6 +511,7 @@ class YouTubeDownloader(tk.Tk):
         if not url:
             messagebox.showerror("Error", "Por favor ingresa una URL válida.")
             return
+        url = limpiar_url_video(url)
         self.status_label.config(text="Obteniendo formatos de video...")
         self.play_sound("click")
         threading.Thread(target=self.list_formats, args=(url,), daemon=True).start()
@@ -461,8 +534,9 @@ class YouTubeDownloader(tk.Tk):
                 img = Image.open(BytesIO(data)).resize((160, 90))
                 photo = ImageTk.PhotoImage(img)
                 self.current_thumbnail = photo
-                self.thumbnail_label.config(image=photo)
-                self.thumbnail_label.image = photo
+                if hasattr(self, "thumbnail_label"):
+                    self.thumbnail_label.config(image=photo)  # <-- CORRECTO
+                    self.thumbnail_label.image = photo        # <-- CORRECTO
 
             # Solo una WebM por resolución
             seen_resolutions = set()
@@ -502,23 +576,15 @@ class YouTubeDownloader(tk.Tk):
     # =============================================================
 
     def download_thread(self) -> None:
-        url = self.url_var.get().strip()
-        if not url:
+        urls = self.get_urls()
+        if not urls:
             messagebox.showerror("Error", "Por favor ingresa una URL válida.")
             return
-        if not self.selected_format.get():
-            messagebox.showerror("Error", "Selecciona una resolución de video.")
-            return
-        if not ffmpeg_available():
-            messagebox.showerror(
-                "FFmpeg requerido",
-                "FFmpeg es necesario para descargar/convertir. Instálalo antes de continuar.",
-            )
-            return
+        urls = [limpiar_url_video(u) for u in urls]
         self.play_sound("click")
         self.progress["value"] = 0
         self.status_label.config(text="Preparando descarga...")
-        threading.Thread(target=self.download, args=(url,), daemon=True).start()
+        threading.Thread(target=lambda: self.download(urls[0]), daemon=True).start()
 
     def download(self, url: str) -> None:
         desc_sel = self.selected_format.get()
@@ -772,8 +838,65 @@ class YouTubeDownloader(tk.Tk):
         ayuda_menu = tk.Menu(menubar, tearoff=0)
         ayuda_menu.add_command(label="Acerca de formatos", command=self.show_help)
         ayuda_menu.add_command(
-            label="Créditos", command=lambda: messagebox.showinfo("Créditos", "Desarrollado por zkingStudios"))
+            label="Créditos", command=lambda: messagebox.showinfo(
+                "Créditos",
+                "Desarrollado por zkingStudios\nContacto: zking500studio@gmail.com"
+            )
+        )
         menubar.add_cascade(label="Ayuda", menu=ayuda_menu)
+
+    def test_ffmpeg_conversion(self):
+        ffmpeg_path = r'C:\ruta\ffmpeg.exe'
+        input_path = r'C:\Users\PC\Videos\Carpeta con espacios\video.webm'
+        output_path = r'C:\Users\PC\Videos\Carpeta con espacios\video.mp4'
+
+        cmd = [
+            ffmpeg_path,
+            '-y',
+            '-i', input_path,
+            '-c:v', 'copy',
+            '-an',
+            output_path
+        ]
+
+        subprocess.run(cmd, check=True)
+
+class MultiFormatSelector(tk.Toplevel):
+    def __init__(self, master, videos_info):
+        super().__init__(master)
+        self.title("Selecciona formato para cada video")
+        self.formats = {}
+        self.comboboxes = []
+        for i, info in enumerate(videos_info):
+            # Muestra el número y el título del video
+            label_text = f"{i+1}. {info['title']}"
+            tk.Label(self, text=label_text, width=60, anchor="w").grid(row=i, column=0, padx=5, pady=2)
+            cb = ttk.Combobox(self, values=info['formats'], width=30)
+            cb.grid(row=i, column=1, padx=5, pady=2)
+            cb.set(info['formats'][0])
+            self.comboboxes.append(cb)
+        tk.Button(self, text="Descargar", command=self.on_download).grid(row=len(videos_info), column=0, columnspan=2, pady=10)
+
+    def on_download(self):
+        selected_formats = [cb.get() for cb in self.comboboxes]
+        # Aquí llamas a tu función de descarga con los formatos seleccionados
+        self.destroy()
+
+def limpiar_url_video(url):
+    """
+    Extrae el ID de video de cualquier URL de YouTube y devuelve la URL limpia.
+    Compatible con videos normales, shorts y YouTube Music.
+    """
+    # Busca el ID de video (11 caracteres) en diferentes formatos de URL
+    patrones = [
+        r"(?:v=|\/)([A-Za-z0-9_-]{11})",  # v=ID o /ID
+    ]
+    for pat in patrones:
+        m = re.search(pat, url)
+        if m:
+            video_id = m.group(1)
+            return f"https://www.youtube.com/watch?v={video_id}"
+    return url  # Si no encuentra, regresa la original
 
 if __name__ == "__main__":
     app = YouTubeDownloader()

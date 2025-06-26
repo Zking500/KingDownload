@@ -17,7 +17,7 @@ Aplicación de escritorio para Windows que descarga videos de YouTube en MP4 (vi
 - FFmpeg (se descarga automáticamente si no está presente)
 
 ## Instalación
-Lee el archivo [`instal.l.txt`](instal.l.txt) para instrucciones detalladas.
+Lee el archivo [`instalacion.txt`](instal.l.txt) para instrucciones detalladas.
 
 ## Compilación a EXE
 Lee el archivo [`compilar.txt`](compilar.txt) para generar el ejecutable.
@@ -25,6 +25,11 @@ Lee el archivo [`compilar.txt`](compilar.txt) para generar el ejecutable.
 ## Uso
 1. Ejecuta `ZkingDownload.py` con Python o usa el ejecutable si lo compilaste.
 2. Pega la URL de YouTube, selecciona formato y descarga.
+
+## Licencia
+
+Este software es gratuito y de uso libre para fines personales, educativos y no comerciales.  
+Consulta el archivo [`LICENSE`](LICENSE) para más detalles.
 
 ---
 

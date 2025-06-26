@@ -1,4 +1,12 @@
-yt-dlp
-pillow
-pygame
-py7zr
+DEPENDENCIAS DEL PROYECTO
+
+- Python 3.9 o superior
+- yt-dlp
+- pillow
+- pygame
+- py7zr
+- tkinter (incluido en Python para Windows)
+- ffmpeg (se descarga automáticamente)
+
+Puedes instalar las dependencias con:
+pip install yt-dlp pillow pygame py7zr

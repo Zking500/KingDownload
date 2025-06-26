@@ -1,0 +1,40 @@
+INSTALACIÓN Y PRIMER USO
+========================
+
+IMPORTANTE: Este programa NO está certificado por Microsoft ni por Apple. Puede que tu antivirus o el sistema operativo te adviertan al ejecutarlo. Si confías en el autor, puedes continuar.
+
+1. **Descarga y descomprime el programa**
+   - Guarda la carpeta del programa en una ruta sencilla, por ejemplo:  
+     `C:\DescargadorYouTube`  
+     (Evita carpetas del sistema como "Archivos de programa" o "Escritorio" para evitar problemas de permisos).
+
+2. **Requisitos previos**
+   - Debes tener instalado **Python 3.9 o superior**.
+   - Si usas Windows, el programa descargará automáticamente FFmpeg y las dependencias la primera vez que lo ejecutes.
+   - Si usas Mac o Linux, instala FFmpeg manualmente y asegúrate de que el comando `ffmpeg` funcione en la terminal.
+
+3. **Primer uso**
+   - Ejecuta el archivo `ZkingDownload.py` con Python:
+     ```
+     python [ZkingDownload.py](http://_vscodecontentref_/0)
+     ```
+   - La primera vez, el programa descargará dependencias y creará archivos de configuración en la misma carpeta.
+   - Si ves advertencias de seguridad, selecciona "Ejecutar de todas formas" o añade una excepción en tu antivirus.
+
+4. **Actualizaciones**
+   - Guarda siempre el programa en una carpeta donde tengas permisos de lectura y escritura.
+   - Para actualizar, reemplaza los archivos del programa pero conserva tus archivos de configuración si lo deseas.
+
+---
+
+LICENCIA DE USO Y MODIFICACIÓN
+==============================
+
+- Este software es **gratuito** y de uso libre para fines personales, educativos y no comerciales.
+- Puedes modificar el código fuente para adaptarlo a tus necesidades, pero **no puedes vender** el programa ni ninguna versión modificada.
+- No se otorga ninguna garantía. El uso es bajo tu propio riesgo.
+- Si distribuyes una versión modificada, debes mantener esta licencia y dar crédito al autor original.
+
+Contacto: zking500studio@gmail.com
+
+---
