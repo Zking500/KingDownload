@@ -569,7 +569,17 @@ class YouTubeDownloader(tk.Tk):
                 self.status_label.config(text="No se encontraron formatos de video‑only.")
 
         except Exception as err:
-            messagebox.showerror("Error", f"No se pudo obtener formatos:\n{err}")
+            err_str = str(err)
+            if "Sign in to confirm you're not a bot" in err_str:
+                messagebox.showerror(
+                    "Límite alcanzado",
+                    "YouTube ha detectado demasiadas descargas desde tu IP y pide verificación humana.\n"
+                    "Esto no es un error del programa, sino una restricción de YouTube.\n\n"
+                    "Suele durar entre unas horas y 1-2 días. Intenta de nuevo más tarde.\n"
+                    "Si tienes apuro, puedes probar con otra red o usar cookies de tu navegador (ver ayuda avanzada en el repositorio)."
+                )
+            else:
+                messagebox.showerror("Error", f"No se pudo obtener formatos:\n{err}")
             self.play_sound("error")
             self.status_label.config(text="")
 
@@ -1031,6 +1041,55 @@ def limpiar_nombre_archivo(nombre):
     nombre = nombre.strip() or "video"
     return nombre[:40]  # Limita a 40 caracteres
 
+class SplashScreen(tk.Toplevel):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.overrideredirect(True)
+        self.configure(bg="#0b1113")
+        self.geometry("400x260+{}+{}".format(
+            int(self.winfo_screenwidth()/2 - 200),
+            int(self.winfo_screenheight()/2 - 130)
+        ))
+
+        # Logo
+        try:
+            img = Image.open(resource_path("img/logo.png")).resize((120, 120))
+            self.logo_img = ImageTk.PhotoImage(img)
+            tk.Label(self, image=self.logo_img, bg="#0b1113").pack(pady=(30, 10))
+        except Exception:
+            tk.Label(self, text="KingDownload", font=("Arial", 20, "bold"), fg="#fff", bg="#0b1113").pack(pady=(40, 10))
+
+        # Texto de carga
+        self.label = tk.Label(self, text="Cargando KingDownload...", font=("Arial", 13), fg="#fff", bg="#0b1113")
+        self.label.pack(pady=(0, 10))
+
+        # Barra de progreso
+        self.progress = ttk.Progressbar(self, length=260, mode="determinate")
+        self.progress.pack(pady=(0, 20))
+        self.progress["value"] = 0
+
+        self.after(100, self.animate_progress)
+
+    def animate_progress(self):
+        # Simula una carga animada (puedes ajustar la velocidad)
+        value = self.progress["value"]
+        if value < 100:
+            self.progress["value"] = value + 5
+            self.after(40, self.animate_progress)
+
+# --- Reemplaza el bloque principal por esto ---
 if __name__ == "__main__":
-    app = YouTubeDownloader()
-    app.mainloop()
+    root = tk.Tk()
+    root.withdraw()  # Oculta la ventana principal mientras carga
+
+    splash = SplashScreen(root)
+    root.update()
+
+    def start_app():
+        splash.destroy()
+        app = YouTubeDownloader()
+        app.mainloop()
+
+    # Simula carga (ajusta el tiempo si tu app tarda más en cargar)
+    root.after(900, start_app)  # 0.9 segundos de splash
+    root.mainloop()
