@@ -26,6 +26,10 @@ COMPILAR A EXE (WINDOWS)
    Windows Defender y otros antivirus pueden detectar el EXE como virus (falso positivo).  
    - Añade una excepción en tu antivirus para la carpeta del EXE.
 
+9. **Actualizar a la última versión y recompilar:**
+   Si hay una nueva versión de ZkingDownload.py, descárgala y reemplaza el archivo en tu carpeta del proyecto.  
+   Luego, repite el paso 5 para volver a compilar el ejecutable con las mejoras más recientes.
+
 ---
 
 **Notas:**
