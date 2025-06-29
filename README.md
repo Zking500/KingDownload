@@ -17,7 +17,7 @@ Aplicación de escritorio para Windows que descarga videos de YouTube en MP4 (vi
 - FFmpeg (se descarga automáticamente si no está presente)
 
 ## Instalación
-Lee el archivo [`instalacion.txt`](instal.l.txt) para instrucciones detalladas.
+Lee el archivo [`instalacion.txt`](instalacion.txt) para instrucciones detalladas.
 
 ## Compilación a EXE
 Lee el archivo [`compilar.txt`](compilar.txt) para generar el ejecutable.
