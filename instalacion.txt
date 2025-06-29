@@ -26,15 +26,3 @@ IMPORTANTE: Este programa NO está certificado por Microsoft ni por Apple. Puede
    - Para actualizar, reemplaza los archivos del programa pero conserva tus archivos de configuración si lo deseas.
 
 ---
-
-LICENCIA DE USO Y MODIFICACIÓN
-==============================
-
-- Este software es **gratuito** y de uso libre para fines personales, educativos y no comerciales.
-- Puedes modificar el código fuente para adaptarlo a tus necesidades, pero **no puedes vender** el programa ni ninguna versión modificada.
-- No se otorga ninguna garantía. El uso es bajo tu propio riesgo.
-- Si distribuyes una versión modificada, debes mantener esta licencia y dar crédito al autor original.
-
-Contacto: zking500studio@gmail.com
-
----

@@ -372,7 +372,7 @@ class YouTubeDownloader(tk.Tk):
                                   fg=TEXTO_COLOR, insertbackground=TEXTO_COLOR)
         self.url_entry.pack(pady=5)
 
-        tk.Label(self, text="Selecciona resolución (solo video):", bg=FONDO_COLOR, fg=TEXTO_COLOR,
+        tk.Label(self, text="Selecciona resolución:", bg=FONDO_COLOR, fg=TEXTO_COLOR,
                  font=FUENTE).pack(pady=(10, 0))
         self.combo_formats = ttk.Combobox(self, textvariable=self.selected_format, width=65, state="readonly")
         self.combo_formats.pack(pady=5)
@@ -380,7 +380,7 @@ class YouTubeDownloader(tk.Tk):
         self.filename_preview = tk.Label(self, text="", bg=FONDO_COLOR, fg=TEXTO_COLOR, font=FUENTE)
         self.filename_preview.pack(pady=5)
 
-        self.btn_download = ttk.Button(self, text="Descargar (MP4 + MP3)", command=self.download_thread)
+        self.btn_download = ttk.Button(self, text="Descargar MP4", command=self.download_thread)  # Cambiado el texto aquí
         self.btn_download.pack(pady=10)
 
         self.progress = ttk.Progressbar(self, length=500, mode="determinate")
@@ -601,7 +601,6 @@ class YouTubeDownloader(tk.Tk):
         outtmpl_video = os.path.join(temp_dir, f"{safe_title}_video.%(ext)s")
         ffmpeg_path = os.path.join(os.getcwd(), "ffmpeg_bin", "ffmpeg.exe")
 
-        # Opciones para descargar el mejor audio
         ydl_opts_audio = {
             "format": "bestaudio/best",
             "outtmpl": outtmpl_audio,
@@ -610,7 +609,6 @@ class YouTubeDownloader(tk.Tk):
             "ffmpeg_location": ffmpeg_path
         }
 
-        # Opciones para descargar solo video
         ydl_opts_video = {
             "format": itag,
             "outtmpl": outtmpl_video,
@@ -624,11 +622,12 @@ class YouTubeDownloader(tk.Tk):
             fases = ["1/3 Descargando audio...", "2/3 Convirtiendo a MP3...", "3/3 Borrando temporales..."]
         else:
             fases = [
-                "1/5 Descargando audio...",
-                "2/5 Descargando video...",
-                "3/5 Convirtiendo video a MP4...",
-                "4/5 Convirtiendo audio a MP3...",
-                "5/5 Borrando temporales..."
+                "1/6 Descargando audio...",
+                "2/6 Descargando video...",
+                "3/6 Convirtiendo video a MP4...",
+                "4/6 Convirtiendo audio a MP3...",
+                "5/6 Combinando video y audio...",
+                "6/6 Borrando temporales..."
             ]
 
         self._start_time = time.time()
@@ -642,10 +641,12 @@ class YouTubeDownloader(tk.Tk):
             # Fase 2: Solo MP3 o Video+Audio
             if self.only_mp3.get():
                 self.status_label.config(text=fases[1])
-                mp3_file = os.path.join(self.download_folder, f"{safe_title}.mp3")
+                mp3_file = os.path.join(temp_dir, f"{safe_title}.mp3")
                 subprocess.run([
                     ffmpeg_path, "-y", "-i", audio_file, "-vn", "-ab", "320k", "-ar", "44100", "-f", "mp3", mp3_file
                 ], check=True)
+                # Mueve el archivo final a la carpeta de descargas
+                shutil.move(mp3_file, os.path.join(self.download_folder, f"{safe_title}.mp3"))
             else:
                 # Fase 2: Descargar video
                 self.status_label.config(text=fases[1])
@@ -653,24 +654,36 @@ class YouTubeDownloader(tk.Tk):
                     info_video = ydl.extract_info(url, download=True)
                     video_file = ydl.prepare_filename(info_video)
 
-                # Fase 3: Convertir video a MP4
+                # Fase 3: Convertir video a MP4 (en temp)
                 self.status_label.config(text=fases[2])
-                mp4_file = os.path.join(self.download_folder, f"{safe_title}.mp4")
+                mp4_file = os.path.join(temp_dir, f"{safe_title}.mp4")
                 cmd = [ffmpeg_path, "-y", "-i", video_file, "-c:v", self.encoder]
                 if self.encoder in ("libx264", "h264_nvenc"):
                     cmd += ["-preset", "fast", "-crf", "22"]
                 cmd += ["-an", mp4_file]
-
                 subprocess.run(cmd, check=True)
 
-                # Fase 4: Convertir audio a MP3
+                # Fase 4: Convertir audio a MP3 (en temp)
                 self.status_label.config(text=fases[3])
-                mp3_file = os.path.join(self.download_folder, f"{safe_title}.mp3")
+                mp3_file = os.path.join(temp_dir, f"{safe_title}.mp3")
                 subprocess.run([
                     ffmpeg_path, "-y", "-i", audio_file, "-vn", "-ab", "320k", "-ar", "44100", "-f", "mp3", mp3_file
                 ], check=True)
 
-            # Fase final: Borrar temporales
+                # Fase 5: Combinar video y audio en un solo MP4 (en carpeta final)
+                self.status_label.config(text=fases[4])
+                final_file = os.path.join(self.download_folder, f"{safe_title}.mp4")
+                subprocess.run([
+                    ffmpeg_path, "-y",
+                    "-i", mp4_file,
+                    "-i", mp3_file,
+                    "-c:v", "copy",
+                    "-c:a", "aac",
+                    "-strict", "experimental",
+                    final_file
+                ], check=True)
+
+            # Fase final: Borrar temporales (borra los 4 archivos temporales)
             self.status_label.config(text=fases[-1])
             for f in os.listdir(temp_dir):
                 try:

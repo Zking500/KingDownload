@@ -6,6 +6,7 @@ COMPILAR A EXE (WINDOWS)
 2. Abre una terminal en la carpeta del proyecto.
 
 3. Ejecuta el siguiente comando para crear el ejecutable:
+   .\venv\Scripts\activate.bat
    pyinstaller --noconfirm --onefile --windowed --icon=img/logo.ico --add-data "img;img" ZkingDownload.py
 
 4. El ejecutable estará en la carpeta "dist".
