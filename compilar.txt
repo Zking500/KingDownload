@@ -1,18 +1,33 @@
 COMPILAR A EXE (WINDOWS)
 
-1. Instala PyInstaller:
+1. **Crea un entorno virtual (recomendado):**
+   python -m venv venv
+
+2. **Activa el entorno virtual:**
+   .\venv\Scripts\activate
+
+3. **Instala las dependencias del proyecto:**
+   pip install -r requisitos.txt
+
+   Si no tienes `requisitos.txt`, instala manualmente:
+   pip install yt-dlp pillow pygame py7zr
+
+4. **Instala PyInstaller dentro del entorno virtual:**
    pip install pyinstaller
 
-2. Abre una terminal en la carpeta del proyecto.
-
-3. Ejecuta el siguiente comando para crear el ejecutable:
-   .\venv\Scripts\activate.bat
+5. **Compila el ejecutable:**
    pyinstaller --noconfirm --onefile --windowed --icon=img/logo.ico --add-data "img;img" ZkingDownload.py
 
-4. El ejecutable estará en la carpeta "dist".
+6. **El ejecutable estará en la carpeta "dist".**
 
-5. Copia la carpeta "img" y "sfx" (si tienes sonidos) junto al EXE para que se vean los iconos y suene la app.
+7. **Las carpetas "img" y "sfx" ya vienen incluidas en el repositorio de GitHub. No necesitas copiarlas, solo compila.**
 
-6. Si Windows detecta el EXE como virus, consulta el README para firmar el ejecutable o añade una excepción en tu antivirus.
+8. **IMPORTANTE:**  
+   Windows Defender y otros antivirus pueden detectar el EXE como virus (falso positivo).  
+   - Añade una excepción en tu antivirus para la carpeta del EXE.
 
 ---
+
+**Notas:**
+- Siempre compila y ejecuta desde el entorno virtual para evitar conflictos de dependencias.
+- Si tienes problemas con dependencias, revisa el archivo `requirements.txt` o instala

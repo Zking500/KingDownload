@@ -3,6 +3,21 @@ INSTALACIÓN Y PRIMER USO
 
 IMPORTANTE: Este programa NO está certificado por Microsoft ni por Apple. Puede que tu antivirus o el sistema operativo te adviertan al ejecutarlo. Si confías en el autor, puedes continuar.
 
+Existen dos formas de usar el programa:
+
+**1. Versión Python (recomendada para usuarios avanzados)**
+- Solo necesitas Python 3.9 o superior instalado.
+- Ejecuta el archivo `ZkingDownload.py` directamente con Python.
+- Esta versión es más sencilla y menos propensa a ser bloqueada por antivirus.
+
+**2. Versión EXE (fusión de video y audio, requiere compilar)**
+- Si quieres usar la función de fusión automática de video y audio (más completa), debes compilar el programa a EXE.
+- Windows Defender y otros antivirus pueden detectar el EXE como sospechoso (falso positivo). Si confías en el programa, añade una excepción en tu antivirus.
+
+---
+
+**Instalación paso a paso (versión Python):**
+
 1. **Descarga y descomprime el programa**
    - Guarda la carpeta del programa en una ruta sencilla, por ejemplo:  
      `C:\DescargadorYouTube`  
@@ -16,13 +31,21 @@ IMPORTANTE: Este programa NO está certificado por Microsoft ni por Apple. Puede
 3. **Primer uso**
    - Ejecuta el archivo `ZkingDownload.py` con Python:
      ```
-     python [ZkingDownload.py](http://_vscodecontentref_/0)
+     python ZkingDownload.py
      ```
    - La primera vez, el programa descargará dependencias y creará archivos de configuración en la misma carpeta.
    - Si ves advertencias de seguridad, selecciona "Ejecutar de todas formas" o añade una excepción en tu antivirus.
 
-4. **Actualizaciones**
-   - Guarda siempre el programa en una carpeta donde tengas permisos de lectura y escritura.
-   - Para actualizar, reemplaza los archivos del programa pero conserva tus archivos de configuración si lo deseas.
+---
+
+**¿Quieres la versión EXE con fusión de video y audio?**
+- Sigue las instrucciones en el archivo `compilar.txt` para compilar el ejecutable.
+- Recuerda: el EXE puede ser detectado como sospechoso por Windows Defender. Es un falso positivo, pero debes añadir una excepción si quieres usarlo.
+
+---
+
+**Actualizaciones**
+- Guarda siempre el programa en una carpeta donde tengas permisos de lectura y escritura.
+- Para actualizar, reemplaza los archivos del programa pero conserva tus archivos de configuración si lo deseas.
 
 ---
