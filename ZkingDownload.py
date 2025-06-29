@@ -537,8 +537,7 @@ class YouTubeDownloader(tk.Tk):
                 photo = ImageTk.PhotoImage(img)
                 self.current_thumbnail = photo
                 if hasattr(self, "thumbnail_label"):
-                    self.thumbnail_label.config(image=photo)  # <-- CORRECTO
-                    self.thumbnail_label.image = photo        # <-- CORRECTO
+                    self.after(0, lambda: self.set_thumbnail(photo))  # <-- CAMBIO AQUÍ
 
             # Solo una WebM por resolución
             seen_resolutions = set()
@@ -808,60 +807,9 @@ class YouTubeDownloader(tk.Tk):
             )
             self.update_idletasks()
 
-    def record_download(self, title: str, formato: str) -> None:
-        """Guarda la descarga en el historial."""
-        entry = {
-            "fecha": time.strftime("%Y-%m-%d %H:%M"),
-            "titulo": title,
-            "formato": formato.split("—")[0].strip(),
-        }
-        
-        historial = []
-        if os.path.exists(HISTORIAL_FILE):
-            with open(HISTORIAL_FILE, "r", encoding="utf-8") as f:
-                try:
-                    historial = json.load(f)
-                except json.JSONDecodeError:
-                    historial = []
-        
-        historial.insert(0, entry)
-        with open(HISTORIAL_FILE, "w", encoding="utf-8") as f:
-            json.dump(historial, f, ensure_ascii=False, indent=2)
-
     def ask_encoder_if_needed(self):
         # Siempre pregunta al usuario qué encoder usar
         self.select_encoder_dialog()
-
-    def load_encoder(self):
-        if os.path.exists("config.txt"):
-            with open("config.txt", "r", encoding="utf-8") as f:
-                self.encoder = f.read().strip()
-        else:
-            self.encoder = "libx264"
-
-    def select_encoder_dialog(self):
-        opciones = [
-            ("h264_nvenc", "Tengo NVIDIA (rápido, recomendado para edición)"),
-            ("h264_amf", "Tengo AMD (rápido, recomendado para edición)"),
-            ("h264_qsv", "Tengo solo gráficos integrados Intel"),
-            ("libx264", "Solo CPU (universal, más lento)"),
-        ]
-        msg = "¿Qué tipo de gráfica tienes?\n\n"
-        for i, (cod, desc) in enumerate(opciones, 1):
-            msg += f"{i}. {desc}\n"
-        msg += "\nEscribe el número de la opción:"
-        sel = simpledialog.askinteger("Configuración de encoder", msg, minvalue=1, maxvalue=len(opciones))
-        if sel and 1 <= sel <= len(opciones):
-            self.encoder = opciones[sel-1][0]
-            with open("config.txt", "w", encoding="utf-8") as f:
-                f.write(self.encoder)
-            messagebox.showinfo("Encoder guardado", f"Encoder '{self.encoder}' guardado en config.txt")
-        else:
-            # Si cancela, usa libx264 por defecto
-            self.encoder = "libx264"
-            with open("config.txt", "w", encoding="utf-8") as f:
-                f.write(self.encoder)
-            messagebox.showwarning("Sin cambios", "No se cambió el encoder. Se usará CPU (libx264).")
 
     def test_ffmpeg_conversion(self):
         ffmpeg_path = r'C:\ruta\ffmpeg.exe'
@@ -950,8 +898,9 @@ class YouTubeDownloader(tk.Tk):
                 photo = ImageTk.PhotoImage(img)
                 self.current_thumbnail = photo
                 if hasattr(self, "thumbnail_label"):
-                    self.thumbnail_label.config(image=photo)
-                    self.thumbnail_label.image = photo
+                    # self.thumbnail_label.config(image=photo)  # <-- ANTES
+                    # self.thumbnail_label.image = photo        # <-- ANTES
+                    self.after(0, lambda: self.set_thumbnail(photo))  # <-- CAMBIO AQUÍ
 
             # Filtrado de formatos
             seen_resolutions = set()
@@ -992,6 +941,22 @@ class YouTubeDownloader(tk.Tk):
         except Exception as err:
             messagebox.showerror("Error", f"No se pudo obtener formatos:\n{err}")
             self.status_label.config(text="")
+
+    def set_thumbnail(self, photo=None):
+        """
+        Asigna la miniatura al label. Si hay error o photo es None, muestra el GIF de error.
+        """
+        if photo is None:
+            try:
+                img = Image.open(resource_path("img/1687179242748DOBkDGBBDUBKCLrB.gif")).resize((160, 90))
+                photo = ImageTk.PhotoImage(img)
+            except Exception:
+                # Si incluso el gif falla, solo limpia la imagen
+                self.thumbnail_label.config(image=None)
+                self.thumbnail_label.image = None
+                return
+        self.thumbnail_label.config(image=photo)
+        self.thumbnail_label.image = photo
 
 class MultiFormatSelector(tk.Toplevel):
     def __init__(self, master, videos_info):
