@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageSequence
 import threading
 import yt_dlp
 import os
@@ -18,7 +18,6 @@ from tkinter import simpledialog
 import tempfile
 import urllib.parse
 import re
-import unicodedata
 
 try:
     import py7zr
@@ -345,12 +344,9 @@ class YouTubeDownloader(tk.Tk):
         modo_frame = tk.Frame(self, bg=FONDO_COLOR)
         modo_frame.pack(pady=(5, 0))
         tk.Label(modo_frame, text="Modo:", bg=FONDO_COLOR, fg=TEXTO_COLOR, font=FUENTE).pack(side="left")
-        # Solo habilita el modo video único
         modos = [
             ("Video único", "video", True),
-            ("Lista (playlist) [v2.0]", "lista", False),
-            ("Multi videos [v2.0]", "multi", False),
-            ("Twitch", "twitch [v1.3]", False),  # <-- Agrega esta línea
+            ("Multi links", "multi", True),  # Habilita el modo multi
         ]
         self.modo_radios = []
         for texto, valor, habilitado in modos:
@@ -362,17 +358,11 @@ class YouTubeDownloader(tk.Tk):
             rb.pack(side="left", padx=5)
             self.modo_radios.append(rb)
 
-        # Mensaje de modos en desarrollo
-        dev_label = tk.Label(
-            self, text="* Modos 'Lista' y 'Multi videos' estarán disponibles en la versión 1.2.",
-            bg=FONDO_COLOR, fg="orange", font=("Arial", 9, "italic")
-        )
-        dev_label.pack(pady=(0, 5))
-
-        # Entrada de URL
-        self.url_entry = tk.Entry(self, textvariable=self.url_var, width=70, font=FUENTE, bg=FONDO_COLOR,
-                                  fg=TEXTO_COLOR, insertbackground=TEXTO_COLOR)
-        self.url_entry.pack(pady=5)
+        # Entrada de URL (ahora Text multilinea)
+        self.url_text = tk.Text(self, height=4, width=70, font=FUENTE, bg=FONDO_COLOR,
+                                fg=TEXTO_COLOR, insertbackground=TEXTO_COLOR)
+        self.url_text.pack(pady=5)
+        self.url_entry = None  # Ya no se usa
 
         tk.Label(self, text="Selecciona resolución:", bg=FONDO_COLOR, fg=TEXTO_COLOR,
                  font=FUENTE).pack(pady=(10, 0))
@@ -412,43 +402,21 @@ class YouTubeDownloader(tk.Tk):
 
     def on_modo_change(self):
         modo = self.modo_var.get()
+        # Solo cambia el widget de entrada
         if modo == "multi":
-            # Pregunta cuántos videos
-            n = simpledialog.askinteger("Multi videos", "¿Cuántos videos quieres descargar?", minvalue=1, maxvalue=20)
-            if not n:
-                self.modo_var.set("video")
-                return
-            # Borra campos previos si existen
-            if hasattr(self, "multi_entries"):
-                for entry in self.multi_entries:
-                    entry.destroy()
-            self.multi_entries = []
-            self.url_entry.pack_forget()
-            self.url_text.pack_forget()
-            self.multi_frame = tk.Frame(self, bg=FONDO_COLOR)
-            self.multi_frame.pack(pady=5)
-            for i in range(n):
-                entry = tk.Entry(self.multi_frame, width=70, font=FUENTE, bg=FONDO_COLOR, fg=TEXTO_COLOR, insertbackground=TEXTO_COLOR)
-                entry.grid(row=i, column=0, pady=2)
-                self.multi_entries.append(entry)
-            # Botón para continuar
-            btn = ttk.Button(self.multi_frame, text="Continuar", command=self.multi_continue)
-            btn.grid(row=n, column=0, pady=5)
-            self.multi_continue_btn = btn
+            if hasattr(self, "url_entry") and self.url_entry:
+                self.url_entry.pack_forget()
+            self.url_text.pack(pady=5)
         else:
-            if hasattr(self, "multi_entries"):
-                for entry in self.multi_entries:
-                    entry.destroy()
-                self.multi_entries = []
-            if hasattr(self, "multi_frame"):
-                self.multi_frame.destroy()
-            self.url_text.pack_forget()
-            self.url_entry.pack(pady=5)
+            self.url_text.pack(pady=5)
 
     def get_urls(self):
-        # Solo modo video único
-        url = self.url_var.get().strip()
-        return [url] if url else []
+        # Devuelve todas las URLs (una por línea, ignora vacías)
+        if hasattr(self, "url_text"):
+            text = self.url_text.get("1.0", tk.END)
+            urls = [u.strip() for u in text.splitlines() if u.strip()]
+            return urls
+        return []
 
     # ---------- utilidades de sonido ---------- #
 
@@ -509,11 +477,12 @@ class YouTubeDownloader(tk.Tk):
     # =============================================================
 
     def list_formats_thread(self) -> None:
-        url = self.url_var.get().strip()
-        if not url:
-            messagebox.showerror("Error", "Por favor ingresa una URL válida.")
+        urls = self.get_urls()
+        if not urls:
+            messagebox.showerror("Error", "Por favor ingresa al menos una URL válida.")
             return
-        url = limpiar_url_video(url)
+        # Solo muestra formatos del primer video
+        url = limpiar_url_video(urls[0])
         self.status_label.config(text="Obteniendo formatos de video...")
         self.play_sound("click")
         threading.Thread(target=self.list_formats, args=(url,), daemon=True).start()
@@ -537,7 +506,8 @@ class YouTubeDownloader(tk.Tk):
                 photo = ImageTk.PhotoImage(img)
                 self.current_thumbnail = photo
                 if hasattr(self, "thumbnail_label"):
-                    self.after(0, lambda: self.set_thumbnail(photo))  # <-- CAMBIO AQUÍ
+                    self.thumbnail_label.config(image=photo)  # <-- CORRECTO
+                    self.thumbnail_label.image = photo        # <-- CORRECTO
 
             # Solo una WebM por resolución
             seen_resolutions = set()
@@ -568,17 +538,7 @@ class YouTubeDownloader(tk.Tk):
                 self.status_label.config(text="No se encontraron formatos de video‑only.")
 
         except Exception as err:
-            err_str = str(err)
-            if "Sign in to confirm you're not a bot" in err_str:
-                messagebox.showerror(
-                    "Límite alcanzado",
-                    "YouTube ha detectado demasiadas descargas desde tu IP y pide verificación humana.\n"
-                    "Esto no es un error del programa, sino una restricción de YouTube.\n\n"
-                    "Suele durar entre unas horas y 1-2 días. Intenta de nuevo más tarde.\n"
-                    "Si tienes apuro, puedes probar con otra red o usar cookies de tu navegador (ver ayuda avanzada en el repositorio)."
-                )
-            else:
-                messagebox.showerror("Error", f"No se pudo obtener formatos:\n{err}")
+            messagebox.showerror("Error", f"No se pudo obtener formatos:\n{err}")
             self.play_sound("error")
             self.status_label.config(text="")
 
@@ -589,13 +549,66 @@ class YouTubeDownloader(tk.Tk):
     def download_thread(self) -> None:
         urls = self.get_urls()
         if not urls:
-            messagebox.showerror("Error", "Por favor ingresa una URL válida.")
+            messagebox.showerror("Error", "Por favor ingresa al menos una URL válida.")
             return
-        urls = [limpiar_url_video(u) for u in urls]
         self.play_sound("click")
         self.progress["value"] = 0
         self.status_label.config(text="Preparando descarga...")
-        threading.Thread(target=lambda: self.download(urls[0]), daemon=True).start()
+        threading.Thread(target=lambda: self.download_multiple(urls), daemon=True).start()
+
+    def download_multiple(self, urls: list[str]) -> None:
+        for idx, url in enumerate(urls, 1):
+            url = limpiar_url_video(url)
+            self.status_label.config(text=f"Descargando video {idx}/{len(urls)}...")
+            # Muestra el GIF por defecto antes de buscar la miniatura real
+            self.show_default_gif()
+            try:
+                ydl_opts = {"quiet": True, "skip_download": True}
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=False)
+                self.current_video_title = info.get("title", "video")
+                self.formats = []
+                seen_resolutions = set()
+                thumbnail_url = info.get("thumbnail")
+                # Si hay miniatura, intenta mostrarla
+                if thumbnail_url:
+                    try:
+                        from urllib.request import urlopen
+                        from io import BytesIO
+                        data = urlopen(thumbnail_url).read()
+                        img = Image.open(BytesIO(data)).resize((160, 90))
+                        photo = ImageTk.PhotoImage(img)
+                        self.current_thumbnail = photo
+                        self.thumbnail_label.config(image=photo)
+                        self.thumbnail_label.image = photo
+                    except Exception:
+                        self.show_default_gif()
+                else:
+                    self.show_default_gif()
+                for f in info.get("formats", []):
+                    acodec, vcodec = f.get("acodec"), f.get("vcodec")
+                    ext = f.get("ext")
+                    resolution = f.get("resolution") or (
+                        f.get("height") and f"{f.get('height')}p") or "?p"
+                    if acodec == "none" and vcodec != "none" and ext == "webm":
+                        if resolution in seen_resolutions:
+                            continue
+                        seen_resolutions.add(resolution)
+                        itag = f.get("format_id")
+                        filesize = f.get("filesize") or f.get("filesize_approx") or 0
+                        size_mb = round(filesize / (1024 * 1024), 2)
+                        desc = f"{resolution} — {ext.upper()} — {size_mb}MB (itag:{itag})"
+                        self.formats.append((desc, itag))
+                if self.formats:
+                    self.selected_format.set(self.formats[-1][0])
+                else:
+                    self.selected_format.set("")
+            except Exception as err:
+                messagebox.showerror("Error", f"No se pudo obtener formatos:\n{err}")
+                self.play_sound("error")
+                continue
+            self.download(url)
+        self.status_label.config(text="Todas las descargas finalizadas.")
 
     def download(self, url: str) -> None:
         desc_sel = self.selected_format.get()
@@ -605,7 +618,7 @@ class YouTubeDownloader(tk.Tk):
             self.play_sound("error")
             return
 
-        safe_title = limpiar_nombre_archivo(self.current_video_title)
+        safe_title = "".join(c for c in self.current_video_title if c.isalnum() or c in " -_")
         temp_dir = os.path.join(self.download_folder, "temp")
         os.makedirs(temp_dir, exist_ok=True)
         outtmpl_audio = os.path.join(temp_dir, f"{safe_title}.%(ext)s")
@@ -665,14 +678,6 @@ class YouTubeDownloader(tk.Tk):
                     info_video = ydl.extract_info(url, download=True)
                     video_file = ydl.prepare_filename(info_video)
 
-                # Verifica si el archivo de video fue creado y no está vacío
-                if not os.path.exists(video_file):
-                    messagebox.showerror("Error", f"El archivo de video no existe:\n{video_file}")
-                    return
-                if os.path.getsize(video_file) == 0:
-                    messagebox.showerror("Error", f"El archivo de video está vacío:\n{video_file}")
-                    return
-
                 # Fase 3: Convertir video a MP4 (en temp)
                 self.status_label.config(text=fases[2])
                 mp4_file = os.path.join(temp_dir, f"{safe_title}.mp4")
@@ -680,18 +685,7 @@ class YouTubeDownloader(tk.Tk):
                 if self.encoder in ("libx264", "h264_nvenc"):
                     cmd += ["-preset", "fast", "-crf", "22"]
                 cmd += ["-an", mp4_file]
-
-                print("Ejecutando FFmpeg:", " ".join(cmd))  # Log para depuración
-
-                try:
-                    subprocess.run(cmd, check=True)
-                except subprocess.CalledProcessError as e:
-                    messagebox.showerror(
-                        "Error al ejecutar FFmpeg",
-                        f"FFmpeg falló con código {e.returncode}.\nComando: {' '.join(cmd)}"
-                    )
-                    self.play_sound("error")
-                    return
+                subprocess.run(cmd, check=True)
 
                 # Fase 4: Convertir audio a MP3 (en temp)
                 self.status_label.config(text=fases[3])
@@ -807,9 +801,86 @@ class YouTubeDownloader(tk.Tk):
             )
             self.update_idletasks()
 
+    def record_download(self, title: str, formato: str) -> None:
+        """Guarda la descarga en el historial."""
+        entry = {
+            "fecha": time.strftime("%Y-%m-%d %H:%M"),
+            "titulo": title,
+            "formato": formato.split("—")[0].strip(),
+        }
+        
+        historial = []
+        if os.path.exists(HISTORIAL_FILE):
+            with open(HISTORIAL_FILE, "r", encoding="utf-8") as f:
+                try:
+                    historial = json.load(f)
+                except json.JSONDecodeError:
+                    historial = []
+        
+        historial.insert(0, entry)
+        with open(HISTORIAL_FILE, "w", encoding="utf-8") as f:
+            json.dump(historial, f, ensure_ascii=False, indent=2)
+
     def ask_encoder_if_needed(self):
         # Siempre pregunta al usuario qué encoder usar
         self.select_encoder_dialog()
+
+    def load_encoder(self):
+        if os.path.exists("config.txt"):
+            with open("config.txt", "r", encoding="utf-8") as f:
+                self.encoder = f.read().strip()
+        else:
+            self.encoder = "libx264"
+
+    def select_encoder_dialog(self):
+        opciones = [
+            ("h264_nvenc", "Tengo NVIDIA (rápido, recomendado para edición)"),
+            ("h264_amf", "Tengo AMD (rápido, recomendado para edición)"),
+            ("h264_qsv", "Tengo solo gráficos integrados Intel"),
+            ("libx264", "Solo CPU (universal, más lento)"),
+        ]
+        msg = "¿Qué tipo de gráfica tienes?\n\n"
+        for i, (cod, desc) in enumerate(opciones, 1):
+            msg += f"{i}. {desc}\n"
+        msg += "\nEscribe el número de la opción:"
+        sel = simpledialog.askinteger("Configuración de encoder", msg, minvalue=1, maxvalue=len(opciones))
+        if sel and 1 <= sel <= len(opciones):
+            self.encoder = opciones[sel-1][0]
+            with open("config.txt", "w", encoding="utf-8") as f:
+                f.write(self.encoder)
+            messagebox.showinfo("Encoder guardado", f"Encoder '{self.encoder}' guardado en config.txt")
+        else:
+            # Si cancela, usa libx264 por defecto
+            self.encoder = "libx264"
+            with open("config.txt", "w", encoding="utf-8") as f:
+                f.write(self.encoder)
+            messagebox.showwarning("Sin cambios", "No se cambió el encoder. Se usará CPU (libx264).")
+
+    # En el menú de configuración, llama a select_encoder_dialog para cambiar el encoder
+    def create_menu(self) -> None:
+        menubar = tk.Menu(self)
+        self.config(menu=menubar)
+
+        archivo_menu = tk.Menu(menubar, tearoff=0)
+        archivo_menu.add_command(label="Seleccionar carpeta...", command=self.select_folder)
+        archivo_menu.add_command(label="Ver historial", command=self.show_history)
+        archivo_menu.add_separator()
+        archivo_menu.add_command(label="Salir", command=self.destroy)
+        menubar.add_cascade(label="Archivo", menu=archivo_menu)
+
+        config_menu = tk.Menu(menubar, tearoff=0)
+        config_menu.add_command(label="Cambiar encoder de video...", command=self.select_encoder_dialog)
+        menubar.add_cascade(label="Configuración", menu=config_menu)
+
+        ayuda_menu = tk.Menu(menubar, tearoff=0)
+        ayuda_menu.add_command(label="Acerca de formatos", command=self.show_help)
+        ayuda_menu.add_command(
+            label="Créditos", command=lambda: messagebox.showinfo(
+                "Créditos",
+                "Desarrollado por zkingStudios\nContacto: zking500studio@gmail.com"
+            )
+        )
+        menubar.add_cascade(label="Ayuda", menu=ayuda_menu)
 
     def test_ffmpeg_conversion(self):
         ffmpeg_path = r'C:\ruta\ffmpeg.exe'
@@ -827,136 +898,29 @@ class YouTubeDownloader(tk.Tk):
 
         subprocess.run(cmd, check=True)
 
-    def list_formats_twitch(self, url: str) -> None:
-        try:
-            ydl_opts = {"quiet": True, "skip_download": True}
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-            self.current_video_title = info.get("title", "twitch_video")
-            self.formats = []
-            for f in info.get("formats", []):
-                if f.get("vcodec") != "none":
-                    itag = f.get("format_id")
-                    desc = f"{f.get('format_note', '')} — {f.get('ext', '').upper()} (itag:{itag})"
-                    self.formats.append((desc, itag))
-            self.combo_formats["values"] = [f[0] for f in self.formats]
-            if self.formats:
-                self.combo_formats.current(0)
-                self.filename_preview.config(text=f"Archivo final: {self.current_video_title}.mp4")
-                self.status_label.config(text=f"Se encontraron {len(self.formats)} resoluciones.")
-            else:
-                self.combo_formats.set("")
-                self.filename_preview.config(text="")
-                self.status_label.config(text="No se encontraron formatos de video.")
-        except Exception as err:
-            messagebox.showerror("Error", f"No se pudo obtener formatos de Twitch:\n{err}")
-            self.status_label.config(text="")
-
-    def download_twitch(self, url: str) -> None:
-        desc_sel = self.selected_format.get()
-        itag = next((itag for desc, itag in self.formats if desc == desc_sel), None)
-        if not itag:
-            messagebox.showerror("Error", "Formato de Twitch inválido seleccionado.")
-            return
-        safe_title = limpiar_nombre_archivo(self.current_video_title)
-        outtmpl = os.path.join(self.download_folder, f"{safe_title}.%(ext)s")
-        ffmpeg_path = os.path.join(os.getcwd(), "ffmpeg_bin", "ffmpeg.exe")
-        ydl_opts = {
-            "format": itag,
-            "outtmpl": outtmpl,
-            "quiet": True,
-            "progress_hooks": [self.progress_hook],
-            "ffmpeg_location": ffmpeg_path
-        }
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([url])
-            messagebox.showinfo("Éxito", "Descarga de Twitch completada.")
-            self.status_label.config(text="Descarga completada.")
-        except Exception as err:
-            messagebox.showerror("Error", f"Error durante la descarga de Twitch:\n{err}")
-            self.status_label.config(text="Error en la descarga de Twitch")
-
-    def list_formats_universal(self, url: str) -> None:
-        """
-        Lista los formatos disponibles para YouTube (solo video-only webm) y Twitch (todos los videos con vcodec).
-        """
-        try:
-            ydl_opts = {"quiet": True, "skip_download": True}
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-            self.current_video_title = info.get("title", "video")
-            thumbnail_url = info.get("thumbnail")
-            self.formats = []
-
-            # Miniatura (opcional)
-            if thumbnail_url:
-                from urllib.request import urlopen
-                from io import BytesIO
-                data = urlopen(thumbnail_url).read()
-                img = Image.open(BytesIO(data)).resize((160, 90))
-                photo = ImageTk.PhotoImage(img)
-                self.current_thumbnail = photo
-                if hasattr(self, "thumbnail_label"):
-                    # self.thumbnail_label.config(image=photo)  # <-- ANTES
-                    # self.thumbnail_label.image = photo        # <-- ANTES
-                    self.after(0, lambda: self.set_thumbnail(photo))  # <-- CAMBIO AQUÍ
-
-            # Filtrado de formatos
-            seen_resolutions = set()
-            for f in info.get("formats", []):
-                acodec = f.get("acodec")
-                vcodec = f.get("vcodec")
-                ext = f.get("ext")
-                resolution = f.get("resolution") or (f.get("height") and f"{f.get('height')}p") or f.get("format_note", "")
-                itag = f.get("format_id")
-                filesize = f.get("filesize") or f.get("filesize_approx") or 0
-                size_mb = round(filesize / (1024 * 1024), 2)
-
-                if "twitch.tv" in url:
-                    # Twitch: muestra todos los formatos de video (vcodec distinto de none)
-                    if vcodec != "none":
-                        desc = f"{resolution} — {ext.upper()} — {size_mb}MB (itag:{itag})"
-                        self.formats.append((desc, itag))
-                else:
-                    # YouTube: solo video-only webm, una por resolución
-                    if acodec == "none" and vcodec != "none" and ext == "webm":
-                        if resolution in seen_resolutions:
-                            continue
-                        seen_resolutions.add(resolution)
-                        desc = f"{resolution} — {ext.upper()} — {size_mb}MB (itag:{itag})"
-                        self.formats.append((desc, itag))
-
-            self.combo_formats["values"] = [f[0] for f in self.formats]
-            if self.formats:
-                self.combo_formats.current(0)
-                preview_name = f"{self.current_video_title}.mp4"
-                self.filename_preview.config(text=f"Archivo final: {preview_name}")
-                self.status_label.config(text=f"Se encontraron {len(self.formats)} resoluciones.")
-            else:
-                self.combo_formats.set("")
-                self.filename_preview.config(text="")
-                self.status_label.config(text="No se encontraron formatos de video.")
-
-        except Exception as err:
-            messagebox.showerror("Error", f"No se pudo obtener formatos:\n{err}")
-            self.status_label.config(text="")
-
-    def set_thumbnail(self, photo=None):
-        """
-        Asigna la miniatura al label. Si hay error o photo es None, muestra el GIF de error.
-        """
-        if photo is None:
+    def show_default_gif(self):
+        gif_path = resource_path("img/1687179242748DOBkDGBBDUBKCLrB.gif")
+        if os.path.exists(gif_path):
+            # Si es GIF animado, muestra la animación
             try:
-                img = Image.open(resource_path("img/1687179242748DOBkDGBBDUBKCLrB.gif")).resize((160, 90))
-                photo = ImageTk.PhotoImage(img)
+                self.gif_frames = [ImageTk.PhotoImage(img) for img in ImageSequence.Iterator(Image.open(gif_path))]
+                self.gif_frame_index = 0
+                self.animate_gif()
             except Exception:
-                # Si incluso el gif falla, solo limpia la imagen
-                self.thumbnail_label.config(image=None)
-                self.thumbnail_label.image = None
-                return
-        self.thumbnail_label.config(image=photo)
-        self.thumbnail_label.image = photo
+                img = Image.open(gif_path)
+                photo = ImageTk.PhotoImage(img)
+                self.thumbnail_label.config(image=photo)
+                self.thumbnail_label.image = photo
+        else:
+            self.thumbnail_label.config(image=None)
+
+    def animate_gif(self):
+        if hasattr(self, "gif_frames"):
+            frame = self.gif_frames[self.gif_frame_index]
+            self.thumbnail_label.config(image=frame)
+            self.thumbnail_label.image = frame
+            self.gif_frame_index = (self.gif_frame_index + 1) % len(self.gif_frames)
+            self.after(100, self.animate_gif)
 
 class MultiFormatSelector(tk.Toplevel):
     def __init__(self, master, videos_info):
@@ -995,66 +959,6 @@ def limpiar_url_video(url):
             return f"https://www.youtube.com/watch?v={video_id}"
     return url  # Si no encuentra, regresa la original
 
-def limpiar_nombre_archivo(nombre):
-    # Elimina caracteres no permitidos en Windows y quita emojis
-    nombre = "".join(
-        c for c in nombre
-        if c.isalnum() or c in " -_"
-    )
-    # Normaliza para quitar acentos y otros símbolos raros
-    nombre = unicodedata.normalize("NFKD", nombre).encode("ascii", "ignore").decode("ascii")
-    nombre = nombre.strip() or "video"
-    return nombre[:40]  # Limita a 40 caracteres
-
-class SplashScreen(tk.Toplevel):
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.overrideredirect(True)
-        self.configure(bg="#0b1113")
-        self.geometry("400x260+{}+{}".format(
-            int(self.winfo_screenwidth()/2 - 200),
-            int(self.winfo_screenheight()/2 - 130)
-        ))
-
-        # Logo
-        try:
-            img = Image.open(resource_path("img/logo.png")).resize((120, 120))
-            self.logo_img = ImageTk.PhotoImage(img)
-            tk.Label(self, image=self.logo_img, bg="#0b1113").pack(pady=(30, 10))
-        except Exception:
-            tk.Label(self, text="KingDownload", font=("Arial", 20, "bold"), fg="#fff", bg="#0b1113").pack(pady=(40, 10))
-
-        # Texto de carga
-        self.label = tk.Label(self, text="Cargando KingDownload...", font=("Arial", 13), fg="#fff", bg="#0b1113")
-        self.label.pack(pady=(0, 10))
-
-        # Barra de progreso
-        self.progress = ttk.Progressbar(self, length=260, mode="determinate")
-        self.progress.pack(pady=(0, 20))
-        self.progress["value"] = 0
-
-        self.after(100, self.animate_progress)
-
-    def animate_progress(self):
-        # Simula una carga animada (puedes ajustar la velocidad)
-        value = self.progress["value"]
-        if value < 100:
-            self.progress["value"] = value + 5
-            self.after(40, self.animate_progress)
-
-# --- Reemplaza el bloque principal por esto ---
 if __name__ == "__main__":
-    root = tk.Tk()
-    root.withdraw()  # Oculta la ventana principal mientras carga
-
-    splash = SplashScreen(root)
-    root.update()
-
-    def start_app():
-        splash.destroy()
-        app = YouTubeDownloader()
-        app.mainloop()
-
-    # Simula carga (ajusta el tiempo si tu app tarda más en cargar)
-    root.after(900, start_app)  # 0.9 segundos de splash
-    root.mainloop()
+    app = YouTubeDownloader()
+    app.mainloop()
